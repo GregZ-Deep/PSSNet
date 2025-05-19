@@ -1,5 +1,20 @@
 #ifdef MATLAB_MEX_FILE
 #include <mex.h>
+extern "C" bool utIsInterruptPending();
+#define INDEX0 1
+static void flushnow()
+{
+	static gcoclock_t prevclock = 0;
+	gcoclock_t now = gcoclock();
+	if (now - prevclock > GCO_CLOCKS_PER_SEC/5) {
+		prevclock = now;
+		mexEvalString("drawnow;");
+	}
+}
+#else
+inline static bool utIsInterruptPending() { return false; }
+#define INDEX0 0
+static void flushnow() { }
 #endif
 #include "GCoptimization.h"
 #include "LinkedBlockList.h"
@@ -15,46 +30,26 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define VC_EXTRALEAN
-#define NOMINMAX
 #include <windows.h>
+#endif
+
 namespace gco
 {
-extern "C" gcoclock_t GCO_CLOCKS_PER_SEC = 0;
-
-extern "C" inline gcoclock_t gcoclock() // TODO: not thread safe; separate begin/end so that end doesn't have to check for query frequency
-{
-	gcoclock_t result = 0;
-	if (GCO_CLOCKS_PER_SEC == 0)
-		QueryPerformanceFrequency((LARGE_INTEGER*)&GCO_CLOCKS_PER_SEC);
-	QueryPerformanceCounter((LARGE_INTEGER*)&result);
-	return result;
-}
-
+	
+gcoclock_t GCO_CLOCKS_PER_SEC = 0;
+gcoclock_t gcoclock() {
+#ifdef _WIN32
+    gcoclock_t result = 0;
+    if (GCO_CLOCKS_PER_SEC == 0)
+        QueryPerformanceFrequency((LARGE_INTEGER*)&GCO_CLOCKS_PER_SEC);
+    QueryPerformanceCounter((LARGE_INTEGER*)&result);
+    return result;
 #else
-extern "C" {
-gcoclock_t GCO_CLOCKS_PER_SEC = CLOCKS_PER_SEC;
-}
-extern "C" gcoclock_t gcoclock() { return clock(); }
+    if (GCO_CLOCKS_PER_SEC == 0)
+        GCO_CLOCKS_PER_SEC = CLOCKS_PER_SEC;
+    return std::clock();
 #endif
-
-#ifdef MATLAB_MEX_FILE
-extern "C" bool utIsInterruptPending();
-static void flushnow()
-{
-	// Don't flush to frequently, for overall speed.
-	static gcoclock_t prevclock = 0;
-	gcoclock_t now = gcoclock();
-	if (now - prevclock > GCO_CLOCKS_PER_SEC/5) {
-		prevclock = now;
-		mexEvalString("drawnow;");
-	}
 }
-#define INDEX0 1  // print 1-based label and site indices for MATLAB
-#else
-inline static bool utIsInterruptPending() { return false; }
-static void flushnow() { }
-#define INDEX0 0  // print 0-based label and site indices
-#endif
 
 // Singly-linked list helper functions; works on any struct with a 'next' member.
 template <typename T>
@@ -348,15 +343,15 @@ void GCoptimization::setupSmoothCostsExpansion(SiteID size,LabelID alpha_label,E
 		{
 			nSite = nPointer[n];
 			if ( m_lookupSiteVar[nSite] == -1 ) 
-				addterm1_checked(e,i,sc->compute(site,nSite,alpha_label,m_labeling[nSite]),
-				                     sc->compute(site,nSite,m_labeling[site],m_labeling[nSite]),weights[n]);
+                addterm1_checked(e,i,sc->compute(site,nSite,alpha_label,m_labeling[nSite]),
+                                     sc->compute(site,nSite,m_labeling[site],m_labeling[nSite]),weights[n]);
 			else if ( nSite < site ) 
 			{
 				addterm2_checked(e,i,m_lookupSiteVar[nSite],
-				                 sc->compute(site,nSite,alpha_label,alpha_label),
-				                 sc->compute(site,nSite,alpha_label,m_labeling[nSite]),
-				                 sc->compute(site,nSite,m_labeling[site],alpha_label),
-				                 sc->compute(site,nSite,m_labeling[site],m_labeling[nSite]),weights[n]);
+                                 sc->compute(site,nSite,alpha_label,alpha_label),
+                                 sc->compute(site,nSite,alpha_label,m_labeling[nSite]),
+                                 sc->compute(site,nSite,m_labeling[site],alpha_label),
+                                 sc->compute(site,nSite,m_labeling[site],m_labeling[nSite]),weights[n]);
 			}
 		}
 	}
@@ -1176,6 +1171,7 @@ void GCoptimization::updateLabelingInfo(bool updateCounts, bool updateActive, bo
 				lc->active = false;
 
 			EnergyType energy = 0;
+            SUPPRESS_WARNING(energy);
 			for ( LabelID l = 0; l < m_num_labels; ++l ) 
 				if ( m_labelCounts[l] )
 					for ( LabelCostIter* lci = m_labelcostsByLabel[l]; lci; lci = lci->next ) 
@@ -1232,7 +1228,7 @@ bool GCoptimization::alpha_expansion(LabelID alpha_label)
 		// and compute the smooth costs between variables.
 		EnergyT e(size+m_labelcostCount, // poor guess at number of pairwise terms needed :(
 				 m_numNeighborsTotal+(m_labelcostCount?size+m_labelcostCount : 0),
-				 handleError);
+                 (void(*)(const char*))handleError);
 		e.add_variable(size);
 		m_beforeExpansionEnergy = 0;
 		if ( m_setupDataCostsExpansion   ) (this->*m_setupDataCostsExpansion  )(size,alpha_label,&e,activeSites);
@@ -1366,7 +1362,7 @@ void GCoptimization::alpha_beta_swap(LabelID alpha_label, LabelID beta_label)
 
 		// Create binary variables for each remaining site, add the data costs,
 		// and compute the smooth costs between variables.
-		EnergyT e(size,m_numNeighborsTotal,handleError);
+        EnergyT e(size,m_numNeighborsTotal,(void(*)(const char*))handleError);
 		e.add_variable(size);
 		if ( m_setupDataCostsSwap   ) (this->*m_setupDataCostsSwap  )(size,alpha_label,beta_label,&e,activeSites);
 		if ( m_setupSmoothCostsSwap ) (this->*m_setupSmoothCostsSwap)(size,alpha_label,beta_label,&e,activeSites);
@@ -1498,7 +1494,7 @@ void GCoptimizationGridGraph::giveNeighborInfo(SiteID site, SiteID *numSites, Si
 void GCoptimizationGridGraph::computeNeighborWeights(EnergyTermType *vCosts,EnergyTermType *hCosts)
 {
 	SiteID i,n,nSite;
-	GCoptimization::EnergyTermType weight;
+    GCoptimization::EnergyTermType weight = 0;
 	
 	m_neighborsWeights = new EnergyTermType[m_num_sites*4];
 
@@ -1613,8 +1609,8 @@ void GCoptimizationGeneralGraph::finalizeNeighbors()
 
 	}
 
-	delete[] tempIndexes; //tempIndexes = NULL;
-	delete[] tempWeights; //tempWeights = NULL;
+	delete [] tempIndexes;
+	delete [] tempWeights;
 	if (m_neighbors) {
 		delete [] m_neighbors;
 		m_neighbors = 0;
@@ -1876,4 +1872,4 @@ GCoptimization::SiteID GCoptimization::DataCostFnSparse::queryActiveSitesExpansi
 	return count;
 }
 
-}
+} // namespace gco

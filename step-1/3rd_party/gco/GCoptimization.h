@@ -101,6 +101,9 @@
 #define __GCOPTIMIZATION_H__
 // Due to quiet bugs in function template specialization, it is not 
 // safe to use earlier MS compilers. 
+
+#define SUPPRESS_WARNING(a) (void)a
+
 #if defined(_MSC_VER) && _MSC_VER < 1400
 #error Requires Visual C++ 2005 (VC8) compiler or later.
 #endif
@@ -109,12 +112,23 @@
 #include "energy.h"
 #include "graph.cpp"
 #include "maxflow.cpp"
+#include <ctime>
 
 /////////////////////////////////////////////////////////////////////
 // Utility functions, classes, and macros
 /////////////////////////////////////////////////////////////////////
 namespace gco
 {
+	#ifdef _WIN32
+	typedef __int64 gcoclock_t;
+	#else
+	#include <ctime>
+	typedef clock_t gcoclock_t;
+	#endif
+
+	extern gcoclock_t GCO_CLOCKS_PER_SEC;
+	gcoclock_t gcoclock();
+
 class GCException {
 public:
 	const char* message;
@@ -122,14 +136,8 @@ public:
 	void Report();
 };
 
-#ifdef _WIN32
-typedef __int64 gcoclock_t;
-#else
-#include <ctime>
-typedef clock_t gcoclock_t;
-#endif
-extern "C" gcoclock_t gcoclock(); // fairly high-resolution timer... better than clock() when available
-extern "C" gcoclock_t GCO_CLOCKS_PER_SEC; // this variable will stay 0 until gcoclock() is called for the first time
+// extern "C" gcoclock_t gcoclock(); // fairly high-resolution timer... better than clock() when available
+// extern "C" gcoclock_t GCO_CLOCKS_PER_SEC; // this variable will stay 0 until gcoclock() is called for the first time
 
 #ifdef _MSC_EXTENSIONS
 #define OLGA_INLINE __forceinline
@@ -138,16 +146,9 @@ extern "C" gcoclock_t GCO_CLOCKS_PER_SEC; // this variable will stay 0 until gco
 #endif
 
 #ifndef GCO_MAX_ENERGYTERM
-#define GCO_MAX_ENERGYTERM 1000000000  // maximum safe coefficient to avoid integer overflow
+#define GCO_MAX_ENERGYTERM 10000000  // maximum safe coefficient to avoid integer overflow
                                      // if a data/smooth/label cost term is larger than this,
                                      // the library will raise an exception
-#endif
-
-#if defined(GCO_ENERGYTYPE) && !defined(GCO_ENERGYTERMTYPE)
-#define GCO_ENERGYTERMTYPE GCO_ENERGYTYPE
-#endif
-#if !defined(GCO_ENERGYTYPE) && defined(GCO_ENERGYTERMTYPE)
-#define GCO_ENERGYTYPE GCO_ENERGYTERMTYPE
 #endif
 
 
@@ -159,17 +160,15 @@ class LinkedBlockList;
 class GCoptimization
 {
 public: 
-#ifdef GCO_ENERGYTYPE
-	typedef GCO_ENERGYTYPE EnergyType;
-	typedef GCO_ENERGYTERMTYPE EnergyTermType;
-#else
 #ifdef GCO_ENERGYTYPE32
-	typedef int EnergyType;        // 32-bit energy total
+	//typedef int EnergyType;        // 32-bit energy total
+	typedef float EnergyType;        // 32-bit energy total
 #else
-	typedef long long EnergyType;  // 64-bit energy total
+	//typedef long long EnergyType;  // 64-bit energy total
+	typedef double EnergyType;  // 64-bit energy total
 #endif
-	typedef int EnergyTermType;    // 32-bit energy terms
-#endif
+	//typedef int EnergyTermType;    // 32-bit energy terms
+    typedef double EnergyTermType;    // 32-bit energy terms
 	typedef Energy<EnergyTermType,EnergyTermType,EnergyType> EnergyT;
 	typedef EnergyT::Var VarID;
 	typedef int LabelID;                     // Type for labels
@@ -290,43 +289,49 @@ protected:
 
 	LabelID m_num_labels;
 	SiteID  m_num_sites;
+        EnergyTermType* m_datacostIndividual;
+        EnergyTermType* m_smoothcostIndividual;
+        LabelCost*      m_labelcostsAll;
+        LabelCostIter** m_labelcostsByLabel;
+        int             m_labelcostCount;
+        void*   m_smoothcostFn;
+        void*   m_datacostFn;
+        SiteID  m_numNeighborsTotal;         // holds total num of neighbor relationships
+        SiteID (GCoptimization::*m_queryActiveSitesExpansion)(LabelID, SiteID*);
+        void (GCoptimization::*m_setupDataCostsSwap)(SiteID,LabelID,LabelID,EnergyT*,SiteID*);
+        void (GCoptimization::*m_setupDataCostsExpansion)(SiteID,LabelID,EnergyT*,SiteID*);
+        void (GCoptimization::*m_setupSmoothCostsSwap)(SiteID,LabelID,LabelID,EnergyT*,SiteID*);
+        void (GCoptimization::*m_setupSmoothCostsExpansion)(SiteID,LabelID,EnergyT*,SiteID*);
+        void (GCoptimization::*m_applyNewLabeling)(EnergyT*,SiteID*,SiteID,LabelID);
+        void (GCoptimization::*m_updateLabelingDataCosts)();
+        EnergyType (GCoptimization::*m_giveSmoothEnergyInternal)();
+        bool (GCoptimization::*m_solveSpecialCases)(EnergyType&);
+        void (*m_datacostFnDelete)(void* f);
+        void (*m_smoothcostFnDelete)(void* f);
+        int      m_random_label_order;
+        int             m_verbosity;
+        bool            m_labelingInfoDirty;
+        SiteID  *m_lookupSiteVar; // holds index of variable corresponding to site participating in a move,
+                                  // -1 for nonparticipating site
 	LabelID *m_labeling;
-	SiteID  *m_lookupSiteVar; // holds index of variable corresponding to site participating in a move,
-	                          // -1 for nonparticipating site
 	LabelID *m_labelTable;    // to figure out label order in which to do expansion/swaps
-	int      m_stepsThisCycle;
+        EnergyTermType* m_labelingDataCosts;
+        SiteID*         m_labelCounts;
+        SiteID*         m_activeLabelCounts;
+        int      m_stepsThisCycle;
 	int      m_stepsThisCycleTotal;
-	int      m_random_label_order;
-	EnergyTermType* m_datacostIndividual;
-	EnergyTermType* m_smoothcostIndividual;
-	EnergyTermType* m_labelingDataCosts;
-	SiteID*         m_labelCounts;
-	SiteID*         m_activeLabelCounts;
-	LabelCost*      m_labelcostsAll;
-	LabelCostIter** m_labelcostsByLabel;
-	int             m_labelcostCount;
-	bool            m_labelingInfoDirty;
-	int             m_verbosity;
 
-	void*   m_datacostFn;
-	void*   m_smoothcostFn;
 	EnergyType m_beforeExpansionEnergy;
+        SiteID *m_numNeighbors;              // holds num of neighbors for each site
 
-	SiteID *m_numNeighbors;              // holds num of neighbors for each site
-	SiteID  m_numNeighborsTotal;         // holds total num of neighbor relationships
 
-	EnergyType (GCoptimization::*m_giveSmoothEnergyInternal)();
-	SiteID (GCoptimization::*m_queryActiveSitesExpansion)(LabelID, SiteID*);
-	void (GCoptimization::*m_setupDataCostsExpansion)(SiteID,LabelID,EnergyT*,SiteID*);
-	void (GCoptimization::*m_setupSmoothCostsExpansion)(SiteID,LabelID,EnergyT*,SiteID*);
-	void (GCoptimization::*m_setupDataCostsSwap)(SiteID,LabelID,LabelID,EnergyT*,SiteID*);
-	void (GCoptimization::*m_setupSmoothCostsSwap)(SiteID,LabelID,LabelID,EnergyT*,SiteID*);
-	void (GCoptimization::*m_applyNewLabeling)(EnergyT*,SiteID*,SiteID,LabelID);
-	void (GCoptimization::*m_updateLabelingDataCosts)();
 
-	void (*m_datacostFnDelete)(void* f);
-	void (*m_smoothcostFnDelete)(void* f);
-	bool (GCoptimization::*m_solveSpecialCases)(EnergyType&);
+
+
+
+
+
+
 
 	// returns a pointer to the neighbors of a site and the weights
 	virtual void giveNeighborInfo(SiteID site, SiteID *numSites, SiteID **neighbors, EnergyTermType **weights)=0;
@@ -359,7 +364,11 @@ protected:
 	struct SmoothCostFnFromArray {
 		SmoothCostFnFromArray(EnergyTermType* theArray, LabelID num_labels)
 			: m_array(theArray), m_num_labels(num_labels){}
-		OLGA_INLINE EnergyTermType compute(SiteID s1, SiteID s2, LabelID l1, LabelID l2){return m_array[l1*m_num_labels+l2];}
+        OLGA_INLINE EnergyTermType compute(SiteID s1, SiteID s2, LabelID l1, LabelID l2){
+            SUPPRESS_WARNING(s1);
+            SUPPRESS_WARNING(s2);
+            return m_array[l1*m_num_labels+l2];
+        }
 	private:
 		const EnergyTermType* const m_array;
 		const LabelID m_num_labels;
@@ -383,7 +392,7 @@ protected:
 	};
 
 	struct SmoothCostFnPotts {
-		OLGA_INLINE EnergyTermType compute(SiteID, SiteID, LabelID l1, LabelID l2){return l1 != l2 ? (EnergyTermType)1 : (EnergyTermType)0;}
+        OLGA_INLINE EnergyTermType compute(SiteID, SiteID, LabelID l1, LabelID l2){return (EnergyTermType) (l1 != l2 ? 1 : 0);}
 	};
 
 	/////////////////////////////////////////////////////////////////////
@@ -517,8 +526,8 @@ private:
 		OLGA_INLINE SiteID feasibleSites() const { return m_numSites; }
 
 	private:
+                DataCostT& m_dc;
 		SiteID m_site;
-		DataCostT& m_dc;
 		const SiteID m_numSites;
 		const LabelID* m_label;
 		const LabelID* m_lbegin;
@@ -626,5 +635,5 @@ OLGA_INLINE GCoptimization::LabelID GCoptimization::whatLabel(SiteID site)
 	return m_labeling[site];
 }
 
-#endif
 }
+#endif

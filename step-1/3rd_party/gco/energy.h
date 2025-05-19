@@ -97,7 +97,7 @@ public:
 	   function which will be called if an error occurs;
 	   an error message is passed to this function. If this
 	   argument is omitted, exit(1) will be called. */
-	Energy(int var_num_max, int edge_num_max, void (*err_function)(const char *) = NULL);
+        Energy(int var_num_max, int edge_num_max, void (*err_function)(const char *) = NULL);
 
 	/* Destructor */
 	~Energy();
@@ -161,7 +161,7 @@ private:
 	/* internal variables and functions */
 
 	TotalValue	Econst;
-	void		(*error_function)(const char *);	/* this function is called if a error occurs,
+        void		(*error_function)(const char *);	/* this function is called if a error occurs,
 											with a corresponding error message
 											(or exit(1) is called if it's NULL) */
 };
@@ -205,7 +205,7 @@ template <typename captype, typename tcaptype, typename flowtype>
 inline void Energy<captype,tcaptype,flowtype>::add_term1(Var x,
                               Value A, Value B)
 {
-	this->add_tweights(x, B, A);
+    Energy::add_tweights(x, B, A);
 }
 
 template <typename captype, typename tcaptype, typename flowtype> 
@@ -218,7 +218,7 @@ inline void Energy<captype,tcaptype,flowtype>::add_term2(Var x, Var y,
 	       D D     C-D 0
 	   Add edges for the first term
 	*/
-	this->add_tweights(x, D, A);
+    Energy::add_tweights(x, D, A);
 	B -= A; C -= D;
 
 	/* now need to represent
@@ -233,9 +233,9 @@ inline void Energy<captype,tcaptype,flowtype>::add_term2(Var x, Var y,
 		   B B  +  -B 0  +  0   0
 		   0 0     -B 0     B+C 0
 		*/
-		this->add_tweights(x, 0, B); /* first term */
-		this->add_tweights(y, 0, -B); /* second term */
-		this->add_edge(x, y, 0, B+C); /* third term */
+        Energy::add_tweights(x, 0, B); /* first term */
+        Energy::add_tweights(y, 0, -B); /* second term */
+        Energy::add_edge(x, y, 0, B+C); /* third term */
 	}
 	else if (C < 0)
 	{
@@ -243,13 +243,13 @@ inline void Energy<captype,tcaptype,flowtype>::add_term2(Var x, Var y,
 		   -C -C  +  C 0  +  0 B+C
 		    0  0     C 0     0 0
 		*/
-		this->add_tweights(x, 0, -C); /* first term */
-		this->add_tweights(y, 0, C); /* second term */
-		this->add_edge(x, y, B+C, 0); /* third term */
+        Energy::add_tweights(x, 0, -C); /* first term */
+        Energy::add_tweights(y, 0, C); /* second term */
+        Energy::add_edge(x, y, B+C, 0); /* third term */
 	}
 	else /* B >= 0, C >= 0 */
 	{
-		this->add_edge(x, y, B, C);
+        Energy::add_edge(x, y, B, C);
 	}
 }
 
@@ -260,9 +260,9 @@ inline void Energy<captype,tcaptype,flowtype>::add_term3(Var x, Var y, Var z,
                               Value E100, Value E101,
                               Value E110, Value E111)
 {
-	register Value pi = (E000 + E011 + E101 + E110) - (E100 + E010 + E001 + E111);
-	register Value delta;
-	register Var u;
+    Value pi = (E000 + E011 + E101 + E110) - (E100 + E010 + E001 + E111);
+    Value delta;
+    Var u;
 
 	if (pi >= 0)
 	{
@@ -317,7 +317,7 @@ inline void Energy<captype,tcaptype,flowtype>::add_term3(Var x, Var y, Var z,
 		add_edge(u, x, -pi, 0);
 		add_edge(u, y, -pi, 0);
 		add_edge(u, z, -pi, 0);
-		this->add_tweights(u, -pi, 0);
+		add_tweights(u, -pi, 0);
 	}
 }
 
@@ -326,6 +326,6 @@ inline typename Energy<captype,tcaptype,flowtype>::TotalValue Energy<captype,tca
 return Econst + GraphT::maxflow(); }
 
 template <typename captype, typename tcaptype, typename flowtype> 
-inline int Energy<captype,tcaptype,flowtype>::get_var(Var x) { return (int) this->what_segment(x); }
+inline int Energy<captype,tcaptype,flowtype>::get_var(Var x) { return (int) Energy::what_segment(x); }
 }
 #endif

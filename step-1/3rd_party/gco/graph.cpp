@@ -9,7 +9,7 @@
 namespace gco
 {
 template <typename captype, typename tcaptype, typename flowtype> 
-	Graph<captype, tcaptype, flowtype>::Graph(int node_num_max, int edge_num_max, void (*err_function)(const char *))
+    Graph<captype, tcaptype, flowtype>::Graph(int node_num_max, int edge_num_max, void (*err_function)(const char *))
 	: node_num(0),
 	  nodeptr_block(NULL),
 	  error_function(err_function)
@@ -19,7 +19,7 @@ template <typename captype, typename tcaptype, typename flowtype>
 
 	nodes = (node*) malloc(node_num_max*sizeof(node));
 	arcs = (arc*) malloc(2*edge_num_max*sizeof(arc));
-	if (!nodes || !arcs) { if (error_function) (*error_function)("Not enough memory!"); exit(1); }
+    if (!nodes || !arcs) { if (error_function) (*error_function)("Not enough memory!"); exit(1); }
 
 	node_last = nodes;
 	node_max = nodes + node_num_max;

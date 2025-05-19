@@ -16,7 +16,7 @@ void LinkedBlockList::addFront(ListType item) {
 		m_head_block_size = 0;
 	}
 	
-	m_head ->m_item[m_head_block_size] = item;
+    m_head ->m_item[(int)m_head_block_size] = item;
 	m_head_block_size++;
 }
 
@@ -24,7 +24,7 @@ void LinkedBlockList::addFront(ListType item) {
 
 ListType LinkedBlockList::next()
 {
-	ListType toReturn = m_cursor -> m_item[m_cursor_ind];
+    ListType toReturn = m_cursor -> m_item[(int)m_cursor_ind];
 
 	m_cursor_ind++;
 

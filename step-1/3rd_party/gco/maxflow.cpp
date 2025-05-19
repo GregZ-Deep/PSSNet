@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include "graph.h"
 
-
 namespace gco
 {
 /*
@@ -30,6 +29,7 @@ namespace gco
 	is empty, it is replaced by the second queue
 	(and the second queue becomes empty).
 */
+
 
 template <typename captype, typename tcaptype, typename flowtype> 
 	inline void Graph<captype,tcaptype,flowtype>::set_active(node *i)
@@ -364,7 +364,7 @@ template <typename captype, typename tcaptype, typename flowtype>
 		}
 	}
 
-	if (i->parent = a0_min)
+    if ((i->parent = a0_min))
 	{
 		i -> TS = TIME;
 		i -> DIST = d_min + 1;
@@ -441,7 +441,7 @@ template <typename captype, typename tcaptype, typename flowtype>
 		}
 	}
 
-	if (i->parent = a0_min)
+    if ((i->parent = a0_min))
 	{
 		i -> TS = TIME;
 		i -> DIST = d_min + 1;
