@@ -29,6 +29,27 @@ SConsChecks submodule must be initialized by git before building
 by running
 
     git submodule update --init
+    mkdir build
+    cd build
+    cmake ..
+    make
+    make install
+`You will see  make result installed in /usr/local/lib64/libboost_numpy.so` 
+
+    -- Install configuration: ""
+    -- Installing: /usr/local/include/boost
+    -- Installing: /usr/local/include/boost/numpy
+    -- Installing: /usr/local/include/boost/numpy/dtype.hpp
+    -- Installing: /usr/local/include/boost/numpy/internal.hpp
+    -- Installing: /usr/local/include/boost/numpy/invoke_matching.hpp
+    -- Installing: /usr/local/include/boost/numpy/matrix.hpp
+    -- Installing: /usr/local/include/boost/numpy/ndarray.hpp
+    -- Installing: /usr/local/include/boost/numpy/numpy_object_mgr_traits.hpp
+    -- Installing: /usr/local/include/boost/numpy/scalars.hpp
+    -- Installing: /usr/local/include/boost/numpy/ufunc.hpp
+    -- Installing: /usr/local/include/boost/numpy.hpp
+    -- Installing: /usr/local/lib64/libboost_numpy.so
+    -- Set non-toolchain portion of runtime path of "/usr/local/lib64/libboost_numpy.so" to ""
 
 
 ## DOCUMENTATION
